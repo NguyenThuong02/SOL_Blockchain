@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Voting {
+    // Struct to store voter data
+    struct BallotVoter {
+        uint256 id; // Unique ID for the ballot
+        string[] candidates; // List of candidate IDs
+        string voterId; // Voter's unique ID
+        string voteId; // Vote ID for the election
+        string votedTime; // Timestamp when the vote was cast
+        string bitcoinAddress; // Bitcoin address of the voter
+    }
+
+    // Mappings
+    mapping(address => BallotVoter) private ballotVoters; // Maps an Ethereum address to a BallotVoter
+    mapping(string => mapping(string => bool)) private voteExists; // Tracks if a vote exists (voteId => voterId => exists)
+    mapping(string => mapping(string => uint256)) private candidateVoteCounts; // Tracks votes per candidate (voteId => candidateId => count)
+
+    // Event emitted when a vote is submitted
+    event BallotSubmitted(
+        address indexed voterAddress, 
+        uint256 indexed ballotId, 
+        string voteId, 
+        string voterId, 
+        string bitcoinAddress // Include Bitcoin address
+    );
+
+    uint256 private ballotCounter; // Counter to assign unique IDs to ballots
+
+    constructor() {
+        ballotCounter = 0; // Initialize the ballot counter
+    }
+
+    // Function to submit a vote
+    function giveVotingRight(
+        string memory bitcoinAddress,
+        string[] memory candidates,
+        string memory voterId,
+        string memory voteId,
+        string memory votedTime
+    ) public {
+        require(candidates.length > 0, "Candidates list cannot be empty");
+        require(!voteExists[voteId][voterId], "This vote already exists");
+        // require(isValidBitcoinAddress(bitcoinAddress), "Invalid Bitcoin address");
+
+        // Increment the ballot counter
+        ballotCounter++;
+
+        // Save ballot voter data
+        BallotVoter storage voter = ballotVoters[msg.sender];
+        voter.id = ballotCounter;
+        voter.candidates = candidates;
+        voter.voterId = voterId;
+        voter.voteId = voteId;
+        voter.votedTime = votedTime;
+        voter.bitcoinAddress = bitcoinAddress;
+
+        // Mark the vote as existing
+        voteExists[voteId][voterId] = true;
+
+        // Increment vote counts for each candidate
+        for (uint256 i = 0; i < candidates.length; i++) {
+            candidateVoteCounts[voteId][candidates[i]]++;
+        }
+
+        // Emit an event for the submitted ballot
+        emit BallotSubmitted(msg.sender, ballotCounter, voteId, voterId, bitcoinAddress);
+    }
+
+    // Function to get the count of votes for a candidate
+    function countBallotForCandidate(string memory candidateId, string memory voteId) public view returns (uint256) {
+        return candidateVoteCounts[voteId][candidateId];
+    }
+
+    // Function to fetch voter data
+    function getBallotVoterData(address voterAddress)
+        public
+        view
+        returns (
+            uint256,
+            string[] memory,
+            string memory,
+            string memory,
+            string memory,
+            string memory
+        )
+    {
+        BallotVoter storage voter = ballotVoters[voterAddress];
+        require(voter.id != 0, "Voter does not exist");
+
+        return (
+            voter.id,
+            voter.candidates,
+            voter.voterId,
+            voter.voteId,
+            voter.votedTime,
+            voter.bitcoinAddress
+        );
+    }
+
+    // Function to check if a ballot exists
+    function checkExistBallot(string memory voteId, string memory voterId) public view returns (bool) {
+        return voteExists[voteId][voterId];
+    }
+}
